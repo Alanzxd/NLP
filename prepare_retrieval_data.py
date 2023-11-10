@@ -35,9 +35,10 @@ def main(args):
     transformers.logging.set_verbosity_error()
 
     device = "cuda" if torch.cuda.is_available() else "cpu" #test
+    print(f"Using device: {device}")
     tokenizer = tokenizer.to(device) #test
 
-    encodings = tokenizer(dataset, add_special_tokens=False, return_tensors="pt").to(device)
+    encodings = tokenizer(dataset, add_special_tokens=False, return_tensors="pt")
     dataset_len = encodings.input_ids.size(1)
     print("Dataset length:", dataset_len)
 
@@ -65,11 +66,13 @@ def main(args):
             break
 
     batch_size = 1000
+    retriever.model.to(device)
+    
     for i in range(0, len(data), batch_size):
         if i > 0:
             print(f"Finished processing {i}/{len(data)} strides")
-        batch_input_ids = encodings.input_ids[:, data[i:i+batch_size]].to(device)
-        retriever.retrieve(batch_input_ids, k=args.num_docs)
+        input_ids_batch = encodings.input_ids[:, i:i + batch_size].to(device)
+        retriever.retrieve(input_ids_batch, k=args.num_docs)
 
     print(f"Finished processing {len(data)}/{len(data)} strides")
     print(f"Writing to {args.output_file}")
