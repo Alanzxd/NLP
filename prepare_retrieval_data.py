@@ -1,21 +1,16 @@
 import json
 import sys
 import argparse
-
 import transformers
 from datasets import load_dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer
+import torch
 
 from ralm.file_utils import print_args
 from ralm.retrievers.retrieval_factory import add_retriever_args, get_retriever
 
-import torch
-RETRIEVAL_TYPES = [
-    "dense",
-    "sparse",
-]
-
+RETRIEVAL_TYPES = ["dense", "sparse"]
 
 def main(args):
     # Dump args
@@ -34,29 +29,38 @@ def main(args):
 
     transformers.logging.set_verbosity_error()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu" #test
-    print(f"Using device: {device}")
-    tokenizer = tokenizer.to(device) #test
-
+    # Tokenize the data
+    print("Tokenizing dataset...")
     encodings = tokenizer(dataset, add_special_tokens=False, return_tensors="pt")
     dataset_len = encodings.input_ids.size(1)
     print("Dataset length:", dataset_len)
 
+    # Set device for PyTorch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
     print(f"Creating retriever of type {args.retrieval_type}...")
     retriever = get_retriever(args.retrieval_type, args, tokenizer)
 
+    # If retriever has a model and you want to use GPU for it
+    if hasattr(retriever, 'model'):
+        retriever.model.to(device)
+
+    print("Processing dataset...")
     prev_end_loc = 0
     data = []
     for begin_loc in tqdm(range(0, dataset_len, args.stride)):
         end_loc = min(begin_loc + args.max_length, dataset_len)
         target_begin_loc = prev_end_loc
 
-        # d = retriever.retrieve(encodings.input_ids, target_begin_loc, end_loc, title=None)
+        # If your retriever.retrieve function expects tensors on a GPU
+        input_ids = encodings.input_ids[0, target_begin_loc:end_loc].unsqueeze(0).to(device)
+        retrieved_data = retriever.retrieve(input_ids, k=args.num_docs)
 
         d = {
             "begin_location": target_begin_loc,
             "end_location": end_loc,
-            "future": tokenizer.decode(encodings.input_ids[0, target_begin_loc:end_loc])
+            "future": tokenizer.decode(input_ids[0].to('cpu'))
         }
 
         data.append(d)
@@ -65,19 +69,10 @@ def main(args):
         if end_loc >= dataset_len:
             break
 
-    batch_size = 1000
-    retriever.model.to(device)
-    
-    for i in range(0, len(data), batch_size):
-        if i > 0:
-            print(f"Finished processing {i}/{len(data)} strides")
-        input_ids_batch = encodings.input_ids[:, i:i + batch_size].to(device)
-        retriever.retrieve(input_ids_batch, k=args.num_docs)
-
     print(f"Finished processing {len(data)}/{len(data)} strides")
     print(f"Writing to {args.output_file}")
     with open(args.output_file, "w") as f:
-        f.write(json.dumps(data, indent=4))
+        json.dump(data, f, indent=4)
         f.write("\n")
 
     print("Done!")
