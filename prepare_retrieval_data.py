@@ -2,13 +2,15 @@ import json
 import sys
 import argparse
 import transformers
-from datasets import load_dataset
+from datasets import load_dataset  # Ensure this is imported
 from tqdm import tqdm
 from transformers import AutoTokenizer
 import torch
 
+# Make sure the rest of your custom modules are imported correctly
 from ralm.file_utils import print_args
 from ralm.retrievers.retrieval_factory import add_retriever_args, get_retriever
+
 
 RETRIEVAL_TYPES = ["dense", "sparse"]
 
@@ -22,10 +24,10 @@ def main(args):
     print("Loading dataset...")
     if args.load_from == "hf":
         dataset = load_dataset(args.dataset_path, args.dataset_name, split=args.dataset_split)
-        dataset = "".join([x["text"] if x["text"] else " \n" for x in dataset])
+        dataset = [x["text"] for x in dataset if x["text"]]  # List of text entries
     else:
         with open(args.dataset_path, "r") as f:
-            dataset = f.read()
+            dataset = [line.strip() for line in f]  # Assuming each line is a separate data point
 
     transformers.logging.set_verbosity_error()
 
@@ -42,8 +44,8 @@ def main(args):
     print(f"Creating retriever of type {args.retrieval_type}...")
     retriever = get_retriever(args.retrieval_type, args, tokenizer)
 
-    # If retriever has a model and you want to use GPU for it
-    if hasattr(retriever, 'model'):
+    # Move the retriever model to GPU if it exists and if CUDA is available
+    if hasattr(retriever, 'model') and device == "cuda":
         retriever.model.to(device)
 
     print("Processing dataset...")
@@ -53,14 +55,17 @@ def main(args):
         end_loc = min(begin_loc + args.max_length, dataset_len)
         target_begin_loc = prev_end_loc
 
-        # If your retriever.retrieve function expects tensors on a GPU
         input_ids = encodings.input_ids[0, target_begin_loc:end_loc].unsqueeze(0).to(device)
-        retrieved_data = retriever.retrieve(input_ids, k=args.num_docs)
+
+        # Retrieve data for the input_ids
+        # The `retrieve` method is expected to return some data based on the input_ids
+        # You need to determine what exactly should be passed as the `dataset` argument
+        retrieved_data = retriever.retrieve(input_ids, dataset, k=args.num_docs)
 
         d = {
             "begin_location": target_begin_loc,
             "end_location": end_loc,
-            "future": tokenizer.decode(input_ids[0].to('cpu'))
+            "retrieved_data": retrieved_data
         }
 
         data.append(d)
@@ -77,14 +82,12 @@ def main(args):
 
     print("Done!")
 
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    
     assert sys.argv[1] == "--retrieval_type"
     retrieval_type = sys.argv[2]
-
     assert retrieval_type in RETRIEVAL_TYPES
-
-    parser = argparse.ArgumentParser()
 
     parser.add_argument("--output_file", required=True, type=str)
 
@@ -106,3 +109,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
+
