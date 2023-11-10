@@ -1,3 +1,11 @@
+'''python prepare-retreival-data-qa.py \
+--retrieval_type sparse \
+--tokenizer_name gpt2-medium \
+--output_file ./retrieval-popqa-modify.json \
+--dataset_path ./popQA.tsv \
+--num_docs 16
+'''
+print('test')
 import json
 import csv
 import sys
