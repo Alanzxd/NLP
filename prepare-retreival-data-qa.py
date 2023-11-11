@@ -1,13 +1,12 @@
 '''python prepare-retreival-data-qa.py \
 --retrieval_type sparse \
 --tokenizer_name gpt2-medium \
---output_file ./retrieval-popqa-modify.json \
+--output_file ./retrieval-popqa-modify.txt \
 --dataset_path ./popQA.tsv \
 --num_docs 16
 '''
 
 import csv
-import json
 import argparse
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -27,24 +26,21 @@ def main(args):
     print(f"Creating retriever of type {args.retrieval_type}...")
     retriever = get_retriever(args.retrieval_type, args, tokenizer)
 
-    retrieval_data = []
-    for item in tqdm(questions_data):
-        question_id = item['id']
-        question_text = item['question']
-
-        # Placeholder for the retrieval logic
-        # Implement your logic to retrieve ctxs and determine hasanswer
-        ctxs = [{"id": "123456", "text": "Dummy context.", "hasanswer": False} for _ in range(5)]
-
-        retrieval_data.append({
-            "id": question_id,
-            "question": question_text,
-            "ctxs": ctxs
-        })
-
-    print(f"Writing to {args.output_file}")
     with open(args.output_file, "w", encoding='utf-8') as f:
-        json.dump(retrieval_data, f, indent=4)
+        for item in tqdm(questions_data):
+            question_id = item['id']
+            question_text = item['question']
+
+            # Placeholder for the retrieval logic
+            # Implement your logic to retrieve ctxs and determine hasanswer
+            ctxs = [{"id": "123456", "text": "Dummy context.", "hasanswer": False} for _ in range(5)]
+
+            # Write to file in a simple text format
+            f.write(f"ID: {question_id}\n")
+            f.write(f"Question: {question_text}\n")
+            for ctx in ctxs:
+                f.write(f"Context ID: {ctx['id']}, Text: {ctx['text']}, Has Answer: {ctx['hasanswer']}\n")
+            f.write("\n")  # Add a newline for separation between entries
 
     print("Done!")
 
@@ -60,4 +56,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
+
 
