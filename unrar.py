@@ -1,10 +1,7 @@
-import rarfile
-
+import patoolib
 
 rar_name = 'merged_output.rar'
+patoolib.extract_archive(rar_name)
 
-
-with rarfile.RarFile(rar_name) as opened_rar:
-    opened_rar.extractall()
 
 print("ok")
