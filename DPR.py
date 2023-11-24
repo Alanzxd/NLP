@@ -17,7 +17,7 @@ reader_tokenizer = DPRReaderTokenizer.from_pretrained('facebook/dpr-reader-singl
 
 # 函数：编码上下文和问题
 def encode_contexts(contexts):
-    encoded = [ctx_encoder(**ctx_tokenizer(context, return_tensors='pt', truncation=True, max_length=512)).pooler_output for context in contexts]
+    encoded = [ctx_encoder(**ctx_tokenizer(context[:512], return_tensors='pt', truncation=True, max_length=512)).pooler_output for context in contexts]
     return torch.cat(encoded, dim=0)
 
 def encode_question(question):
