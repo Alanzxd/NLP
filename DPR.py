@@ -80,7 +80,7 @@ for i in tqdm(range(0, len(data), batch_size)):
             continue
         
         # 将问题添加到已处理集合
-        processed_questions.add(question)
+        processed_questions.append(question)
         
         # 计算问题与已处理问题的相似度
         is_similar = False
