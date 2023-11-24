@@ -38,8 +38,8 @@ output = []
 processed_questions = set()  # 用于存储已处理的问题
 
 # 分批处理数据
-for i in range(0, len(data), batch_size):
-    batch_data = data[i:i+batch_size]
+for i in range(0, len(data), 10):
+    batch_data = data[i:i+10]
     for item in batch_data:
         question = item['question']
         
