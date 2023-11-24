@@ -5,15 +5,41 @@ from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer
 from transformers import DPRReader, DPRReaderTokenizer
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+from torch.cuda.amp import autocast, GradScaler
 
-# 初始化模型和分词器
-ctx_encoder = DPRContextEncoder.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base').to(device)
-ctx_tokenizer = DPRContextEncoderTokenizer.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
-question_encoder = DPRQuestionEncoder.from_pretrained('facebook/dpr-question_encoder-single-nq-base').to(device)
-question_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained('facebook/dpr-question_encoder-single-nq-base')
-reader = DPRReader.from_pretrained('facebook/dpr-reader-single-nq-base').to(device)
-reader_tokenizer = DPRReaderTokenizer.from_pretrained('facebook/dpr-reader-single-nq-base')
+# 判断是否有多个GPU
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if torch.cuda.device_count() > 1:
+    use_multi_gpu = True
+else:
+    use_multi_gpu = False
+
+if use_multi_gpu:
+    # 初始化多个GPU
+    ctx_encoder = DPRContextEncoder.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base').to('cuda:0')
+    ctx_encoder = torch.nn.DataParallel(ctx_encoder)
+    
+    ctx_tokenizer = DPRContextEncoderTokenizer.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
+    
+    question_encoder = DPRQuestionEncoder.from_pretrained('facebook/dpr-question_encoder-single-nq-base').to('cuda:0')
+    question_encoder = torch.nn.DataParallel(question_encoder)
+    
+    question_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained('facebook/dpr-question_encoder-single-nq-base')
+    
+    reader = DPRReader.from_pretrained('facebook/dpr-reader-single-nq-base').to('cuda:0')
+    reader = torch.nn.DataParallel(reader)
+    
+    reader_tokenizer = DPRReaderTokenizer.from_pretrained('facebook/dpr-reader-single-nq-base')
+else:
+    # 单GPU或CPU模式下的初始化
+    ctx_encoder = DPRContextEncoder.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base').to(device)
+    ctx_tokenizer = DPRContextEncoderTokenizer.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
+    
+    question_encoder = DPRQuestionEncoder.from_pretrained('facebook/dpr-question_encoder-single-nq-base').to(device)
+    question_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained('facebook/dpr-question_encoder-single-nq-base')
+    
+    reader = DPRReader.from_pretrained('facebook/dpr-reader-single-nq-base').to(device)
+    reader_tokenizer = DPRReaderTokenizer.from_pretrained('facebook/dpr-reader-single-nq-base')
 
 # 函数：编码上下文和问题
 def encode_contexts(contexts):
@@ -37,9 +63,15 @@ with open('popQA_DPR.json', 'r') as file:
 output = []
 processed_questions = set()  # 用于存储已处理的问题
 
+# 初始化混合精度训练
+scaler = GradScaler()
+
+# 设置批量大小
+batch_size = 10
+
 # 分批处理数据
-for i in tqdm(range(0, len(data), 5)):
-    batch_data = data[i:i+10]
+for i in tqdm(range(0, len(data), batch_size)):
+    batch_data = data[i:i+batch_size]
     for item in batch_data:
         question = item['question']
         
@@ -89,7 +121,10 @@ for i in tqdm(range(0, len(data), 5)):
             truncation=True,
             max_length=512
         ).to(device)
-        reader_outputs = reader(**inputs)
+
+        # 使用混合精度训练
+        with autocast():
+            reader_outputs = reader(**inputs)
 
         # 提取前5个最佳答案
         top_k = 5
