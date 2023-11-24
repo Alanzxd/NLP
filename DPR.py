@@ -17,11 +17,11 @@ reader_tokenizer = DPRReaderTokenizer.from_pretrained('facebook/dpr-reader-singl
 
 # 函数：编码上下文和问题
 def encode_contexts(contexts):
-    encoded = [ctx_encoder(**ctx_tokenizer(context[:512], return_tensors='pt')).pooler_output for context in contexts]
+    encoded = [ctx_encoder(**ctx_tokenizer(context[:512], return_tensors='pt').to(device)).pooler_output for context in contexts]
     return torch.cat(encoded, dim=0)
 
 def encode_question(question):
-    return question_encoder(**question_tokenizer(question[:512], return_tensors='pt')).pooler_output
+    return question_encoder(**question_tokenizer(question[:512], return_tensors='pt').to(device)).pooler_output
 
 # 计算问题相似度
 def compute_similarity(question1, question2):
@@ -38,7 +38,7 @@ output = []
 processed_questions = set()  # 用于存储已处理的问题
 
 # 分批处理数据
-for i in tqdm(range(0, len(data), 10)):
+for i in tqdm(range(0, len(data), 5)):
     batch_data = data[i:i+10]
     for item in batch_data:
         question = item['question']
