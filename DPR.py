@@ -4,7 +4,7 @@ from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
 from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer
 from transformers import DPRReader, DPRReaderTokenizer
 from sklearn.metrics.pairwise import cosine_similarity
-
+from tqdm import tqdm
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # 初始化模型和分词器
@@ -38,7 +38,7 @@ output = []
 processed_questions = set()  # 用于存储已处理的问题
 
 # 分批处理数据
-for i in range(0, len(data), 10):
+for i in tqdm(range(0, len(data), 10)):
     batch_data = data[i:i+10]
     for item in batch_data:
         question = item['question']
