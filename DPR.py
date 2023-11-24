@@ -5,7 +5,44 @@ from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer
 from transformers import DPRReader, DPRReaderTokenizer
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
+from torch.utils.data import DataLoader, Dataset
 from torch.cuda.amp import autocast, GradScaler
+
+# 自定义数据集类
+class CustomDataset(Dataset):
+    def __init__(self, data):
+        """
+        Args:
+            data (list): 包含数据的列表，每个元素是一个字典，表示一个数据样本。
+                每个字典至少包含以下键：
+                - 'question': 问题文本
+                - 'negative_ctxs': 负面上下文的列表
+                - 'hard_negative_ctxs': 困难负面上下文的列表
+                - 'positive_ctxs': 正面上下文的列表
+        """
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+
+        # 提取样本中的问题和上下文
+        question = sample['question']
+        negative_ctxs = sample['negative_ctxs']
+        hard_negative_ctxs = sample['hard_negative_ctxs']
+        positive_ctxs = sample['positive_ctxs']
+
+        # 构建数据样本字典
+        data_sample = {
+            'question': question,
+            'negative_ctxs': negative_ctxs,
+            'hard_negative_ctxs': hard_negative_ctxs,
+            'positive_ctxs': positive_ctxs
+        }
+
+        return data_sample
 
 # 判断是否有多个GPU
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -60,18 +97,21 @@ def compute_similarity(question1, question2):
 with open('popQA_DPR.json', 'r') as file:
     data = json.load(file)
 
+# 创建自定义数据集
+dataset = CustomDataset(data)
+
+# 创建数据加载器
+batch_size = 10
+data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
 output = []
 processed_questions = set()  # 用于存储已处理的问题
 
 # 初始化混合精度训练
 scaler = GradScaler()
 
-# 设置批量大小
-batch_size = 10
-
 # 分批处理数据
-for i in tqdm(range(0, len(data), batch_size)):
-    batch_data = data[i:i+batch_size]
+for batch_data in tqdm(data_loader):
     for item in batch_data:
         question = item['question']
         
@@ -151,3 +191,5 @@ for i in tqdm(range(0, len(data), batch_size)):
 # 保存结果
 with open('dpr_output.json', 'w') as f:
     json.dump(output, f, indent=4)
+
+
