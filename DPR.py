@@ -67,7 +67,7 @@ processed_questions = set()  # 用于存储已处理的问题
 scaler = GradScaler()
 
 # 设置批量大小
-batch_size = 50
+batch_size = 100
 
 # 分批处理数据
 for i in tqdm(range(0, len(data), batch_size)):
@@ -84,7 +84,7 @@ for i in tqdm(range(0, len(data), batch_size)):
         
         # 计算问题与已处理问题的相似度
         is_similar = False
-        for processed_question in processed_questions:
+        for processed_question in processed_questions[-10:]:
             similarity = compute_similarity(question, processed_question)
             if similarity > 0.90:  # 设置相似度阈值为90%
                 is_similar = True
