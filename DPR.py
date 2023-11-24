@@ -67,7 +67,7 @@ processed_questions = set()  # 用于存储已处理的问题
 scaler = GradScaler()
 
 # 设置批量大小
-batch_size = 30
+batch_size = 50
 
 # 分批处理数据
 for i in tqdm(range(0, len(data), batch_size)):
