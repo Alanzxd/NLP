@@ -61,7 +61,7 @@ with open('popQA_DPR.json', 'r') as file:
     data = json.load(file)
 
 output = []
-processed_questions = set()  # 用于存储已处理的问题
+processed_questions = []  # 用于存储已处理的问题
 
 # 初始化混合精度训练
 scaler = GradScaler()
