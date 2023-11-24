@@ -39,7 +39,7 @@ for i in tqdm(range(0, len(data), batch_size)):
 
         # 编码问题和上下文
         question_embedding = encode_question(question).to(device)
-        context_embeddings = encode_contexts([ctx['text'] for ctx in contexts]).to(device)
+        context_embeddings = encode_contexts([ctx['text'][:512] for ctx in contexts]).to(device)
 
         # 检索相关上下文
         scores = torch.nn.functional.cosine_similarity(question_embedding, context_embeddings).tolist()
@@ -61,7 +61,7 @@ for i in tqdm(range(0, len(data), batch_size)):
             return_tensors='pt',
             padding=True,
             truncation=True,
-            max_length=647
+            max_length=512
         ).to(device)
         reader_outputs = reader(**inputs)
 
