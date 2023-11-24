@@ -3,7 +3,7 @@ import torch
 from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
 from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer
 from transformers import DPRReader, DPRReaderTokenizer
-from tqdm import tqdm
+from sklearn.metrics.pairwise import cosine_similarity
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -17,28 +17,54 @@ reader_tokenizer = DPRReaderTokenizer.from_pretrained('facebook/dpr-reader-singl
 
 # 函数：编码上下文和问题
 def encode_contexts(contexts):
-    encoded = [ctx_encoder(**ctx_tokenizer(context[:512], return_tensors='pt', truncation=True, max_length=512)).pooler_output for context in contexts]
+    encoded = [ctx_encoder(**ctx_tokenizer(context[:512], return_tensors='pt')).pooler_output for context in contexts]
     return torch.cat(encoded, dim=0)
 
 def encode_question(question):
-    return question_encoder(**question_tokenizer(question, return_tensors='pt', truncation=True, max_length=512)).pooler_output
+    return question_encoder(**question_tokenizer(question[:512], return_tensors='pt')).pooler_output
+
+# 计算问题相似度
+def compute_similarity(question1, question2):
+    embeddings1 = encode_question(question1).to(device)
+    embeddings2 = encode_question(question2).to(device)
+    similarity = cosine_similarity(embeddings1.cpu().detach().numpy(), embeddings2.cpu().detach().numpy())
+    return similarity[0][0]
 
 # 加载数据
 with open('popQA_DPR.json', 'r') as file:
     data = json.load(file)
 
 output = []
-batch_size = 5  # 减少每批处理的问题数量
+processed_questions = set()  # 用于存储已处理的问题
 
 # 分批处理数据
-for i in tqdm(range(0, len(data), batch_size)):
+for i in range(0, len(data), batch_size):
     batch_data = data[i:i+batch_size]
     for item in batch_data:
         question = item['question']
-        contexts = item['negative_ctxs'] + item['hard_negative_ctxs'] + item['positive_ctxs']
-
+        
+        # 检查问题是否已经处理过
+        if question in processed_questions:
+            continue
+        
+        # 将问题添加到已处理集合
+        processed_questions.add(question)
+        
+        # 计算问题与已处理问题的相似度
+        is_similar = False
+        for processed_question in processed_questions:
+            similarity = compute_similarity(question, processed_question)
+            if similarity > 0.90:  # 设置相似度阈值为90%
+                is_similar = True
+                break
+        
+        # 如果问题与已处理问题相似，跳过该问题
+        if is_similar:
+            continue
+        
         # 编码问题和上下文
         question_embedding = encode_question(question).to(device)
+        contexts = item['negative_ctxs'] + item['hard_negative_ctxs'] + item['positive_ctxs']
         context_embeddings = encode_contexts([ctx['text'][:512] for ctx in contexts]).to(device)
 
         # 检索相关上下文
