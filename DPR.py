@@ -3,6 +3,7 @@ import torch
 from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
 from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer
 from transformers import DPRReader, DPRReaderTokenizer
+from tqdm import tqdm
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -30,7 +31,7 @@ output = []
 batch_size = 5  # 减少每批处理的问题数量
 
 # 分批处理数据
-for i in range(0, len(data), batch_size):
+for i in tqdm(range(0, len(data), batch_size)):
     batch_data = data[i:i+batch_size]
     for item in batch_data:
         question = item['question']
@@ -60,7 +61,7 @@ for i in range(0, len(data), batch_size):
             return_tensors='pt',
             padding=True,
             truncation=True,
-            max_length=512
+            max_length=647
         ).to(device)
         reader_outputs = reader(**inputs)
 
